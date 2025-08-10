@@ -1,4 +1,4 @@
-name: Docker Continuous Integration to AWS Elastic Container Registry (ECR)
+name: Docker CI to AWS ECR
 
 on:
   workflow_dispatch:
@@ -8,8 +8,12 @@ env:
   ECR_REPOSITORY: ${{ github.event.repository.name || 'project-template' }}
 
 jobs:
-  build-and-push:
+  setup:
     runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.login-ecr.outputs.registry }}
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
     permissions:
       contents: read
       id-token: write
@@ -38,10 +42,21 @@ jobs:
         with:
           images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
 
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ needs.setup.outputs.tags }}
+          labels: ${{ needs.setup.outputs.labels }}
